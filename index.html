@@ -1,0 +1,1645 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MMD自動口型生成工具</title>
+    <style>
+        :root {
+            --bg-color: #1e1e2e;
+            --card-bg: #252538;
+            --text-color: #cdd6f4;
+            --primary: #cba6f7;
+            --primary-hover: #b4befe;
+            --accent: #f38ba8;
+            --log-bg: #11111b;
+            --border: #313244;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin: 10px 0 5px 0;
+            text-align: center;
+            color: var(--primary);
+        }
+
+        .subtitle {
+            font-size: 0.85rem;
+            color: #a6adc8;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+
+        @media (min-width: 992px) {
+            .container {
+                grid-template-columns: 350px 1fr;
+            }
+            .full-row {
+                grid-column: span 2;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 1.1rem;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 8px;
+            color: var(--primary-hover);
+        }
+
+        .file-label {
+            display: block;
+            text-align: center;
+            background: #313244;
+            padding: 15px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 2px dashed #45475a;
+            transition: background 0.2s;
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+        }
+
+        .file-label:hover { background: #45475a; }
+        input[type="file"] { display: none; }
+
+        .divider {
+            text-align: center;
+            margin: 10px 0;
+            color: #585b70;
+            font-size: 0.8rem;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: #11111b;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9rem;
+            width: 100%;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:hover { background-color: var(--primary-hover); }
+        .btn.recording { background-color: var(--accent); color: #fff; }
+        .btn:disabled { background-color: #313244; color: #585b70; cursor: not-allowed; }
+
+        .checkbox-group {
+            margin: 12px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            font-size: 0.85rem;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        /* 3D模型唇部大小微調面板 */
+        .control-group-panel {
+            margin: 10px 0;
+            padding: 12px;
+            background: #11111b;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .panel-title {
+            font-size: 0.85rem;
+            color: var(--primary);
+            font-weight: bold;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .slider-row-layout {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            margin-bottom: 6px;
+        }
+        .slider-row-layout label { width: 75px; color: #a6adc8; }
+        .slider-row-layout input[type="range"] {
+            flex: 1;
+            accent-color: var(--primary);
+            height: 4px;
+            cursor: pointer;
+        }
+        .slider-row-layout .val-disp { width: 35px; text-align: right; color: var(--primary-hover); font-family: monospace; }
+
+        select.mode-select-dropdown {
+            width: 100%;
+            background: #313244;
+            color: var(--text-color);
+            border: 1px solid var(--border);
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            outline: none;
+            margin-bottom: 10px;
+            transition: border-color 0.2s;
+        }
+        select.mode-select-dropdown:focus {
+            border-color: var(--primary);
+        }
+
+        audio { display: none !important; }
+
+        #canvas-container {
+            width: 100%;
+            height: 450px;
+            background-color: #11111b;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            border: 1px solid var(--border);
+        }
+
+        /* 預覽視窗視角操控搖桿 */
+        .joystick-panel {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: grid;
+            grid-template-columns: repeat(3, 32px);
+            grid-template-rows: repeat(3, 32px);
+            gap: 2px;
+            z-index: 10;
+            background: rgba(27, 27, 38, 0.85);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(4px);
+        }
+        .joy-btn {
+            background: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            user-select: none;
+            transition: all 0.1s;
+        }
+        .joy-btn:hover { background: #313244; color: var(--primary); }
+        .joy-btn:active { background: var(--primary); color: #11111b; }
+        .joy-btn.center { background: transparent; border: none; cursor: default; font-size: 0.8rem; }
+
+        #view-loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85);
+            color: #a6e3a1;
+            padding: 12px 24px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            display: none;
+            pointer-events: none;
+            z-index: 10;
+            border: 1px solid #313244;
+        }
+
+        #canvas-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(27, 27, 38, 0.95);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-sizing: border-box;
+            border-top: 1px solid var(--border);
+            z-index: 5;
+            backdrop-filter: blur(6px);
+        }
+
+        #canvas-play-btn {
+            background: var(--primary);
+            color: #11111b;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        #canvas-play-btn:hover { background: var(--primary-hover); }
+        #canvas-play-btn:disabled { background: #313244; color: #585b70; cursor: not-allowed; }
+
+        #canvas-slider {
+            flex: 1;
+            accent-color: var(--primary);
+            cursor: pointer;
+            height: 6px;
+            border-radius: 3px;
+            background: #45475a;
+            outline: none;
+        }
+        #canvas-slider:disabled { cursor: not-allowed; opacity: 0.5; }
+
+        #canvas-time-display { 
+            font-size: 0.8rem; 
+            color: #a6adc8; 
+            font-family: monospace; 
+            white-space: nowrap;
+        }
+
+        .log-panel {
+            background: var(--log-bg);
+            border-radius: 8px;
+            padding: 12px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.8rem;
+            border: 1px solid var(--border);
+        }
+
+        .log-item { margin-bottom: 4px; }
+        .log-time { color: #6c7086; margin-right: 6px; }
+        .log-info { color: #cdd6f4; }
+        .log-success { color: #a6e3a1; }
+        .log-warn { color: #f9e2af; }
+        .log-err { color: #f38ba8; }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mmd-parser@1.0.4/build/mmdparser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/TGALoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MMDLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+
+    <h1>MMD 自動口型生成工具</h1>
+    <div class="subtitle"></div>
+
+    <div class="container">
+        <div class="card">
+            <h2>📦 1. MMD 模型載入 (.zip)</h2>
+            <label class="file-label">
+                🗂️ 點擊或拖放模型 ZIP 壓縮檔<br><span style="font-size:0.75rem; color:#6c7086;">(支援包含 .pmx/.pmd 與貼圖)</span>
+                <input type="file" id="model-upload" accept=".zip">
+            </label>
+
+            <div class="control-group-panel">
+                <div class="panel-title">👄 高階 3D 模型唇部微調</div>
+                <div class="slider-row-layout">
+                    <label for="lip-width">嘴部縮放寬度</label>
+                    <input type="range" id="lip-width" min="0.5" max="2.0" step="0.05" value="1.0">
+                    <span class="val-disp" id="lip-width-val">1.0</span>
+                </div>
+                <div class="slider-row-layout">
+                    <label for="lip-height">發音縱向開合</label>
+                    <input type="range" id="lip-height" min="0.5" max="2.0" step="0.05" value="1.0">
+                    <span class="val-disp" id="lip-height-val">1.0</span>
+                </div>
+                <div class="slider-row-layout">
+                    <label for="lip-teeth">嘴部開口深度</label>
+                    <input type="range" id="lip-teeth" min="0.2" max="2.0" step="0.05" value="1.0">
+                    <span class="val-disp" id="lip-teeth-val">1.0</span>
+                </div>
+            </div>
+
+            <h2>🎵 2. 音訊輸入與分析控制</h2>
+            
+            <label style="font-size: 0.8rem; color: #a6adc8; margin-bottom: 5px; font-weight: bold;">🧠 核心分析模式設定：</label>
+            <select id="analysis-mode" class="mode-select-dropdown">
+                <option value="rms">基礎模式</option>
+                <option value="ai_phoneme" selected>母音分析模式</option>
+            </select>
+
+            <label class="file-label">
+                📁 點擊或拖放人聲 MP3 檔案
+                <input type="file" id="audio-upload" accept="audio/mp3, audio/mpeg">
+            </label>
+            <div class="divider">─ 或 ─</div>
+            <button id="record-btn" class="btn">🎙️ 開始錄音模式</button>
+            <button id="download-record-btn" class="btn" style="background-color: #89b4fa; color: #11111b; margin-top: 5px;" disabled>💾 下載錄音</button>
+
+            <div class="checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="denoise-toggle" checked>
+                    <span>🛡️ 開啟智慧音訊降噪系統</span>
+                </label>
+                <div class="slider-row-layout" style="padding-left: 24px; margin-top: -4px;">
+                    <label for="denoise-strength" style="color: #a6adc8; width: 90px;">降噪強度門檻</label>
+                    <input type="range" id="denoise-strength" min="0.005" max="0.200" step="0.005" value="0.045">
+                    <span class="val-disp" id="denoise-strength-val" style="color: var(--primary-hover); width: 40px;">0.045</span>
+                </div>
+                <label class="checkbox-label" style="margin-top: 5px;">
+                    <input type="checkbox" id="blink-toggle" checked>
+                    <span>😉 開啟自然自動眨眼系統</span>
+                </label>
+            </div>
+            
+            <button id="export-vmd-btn" class="btn" style="background-color: #a6e3a1; color: #11111b; margin-top: 5px;" disabled>💾 輸出為 VMD 檔案</button>
+            <button id="export-mp4-btn" class="btn" style="background-color: #f9e2af; color: #11111b; margin-top: 5px;" disabled>🎥 匯出口型動畫（MP4）</button>
+            
+            <audio id="audio-player"></audio>
+        </div>
+
+        <div class="card">
+            <h2>📺 3D 模型預覽視窗 (聚焦面部)</h2>
+            <div id="canvas-container">
+                <div class="joystick-panel">
+                    <button class="joy-btn" id="joy-reset" title="重置鏡頭" style="grid-column: span 3; font-size: 0.75rem; background: #313244; color: var(--primary-hover); margin-bottom: 2px; height: 26px;">初始化 🔄</button>
+                    <div></div><button class="joy-btn" id="joy-up" title="向上平移">🔼</button><div></div>
+                    <button class="joy-btn" id="joy-left" title="向左旋轉">◀️</button><div class="joy-btn center">🕹️</div><button class="joy-btn" id="joy-right" title="向右旋轉">▶️</button>
+                    <div></div><button class="joy-btn" id="joy-down" title="向下平移">🔽</button><div></div>
+                </div>
+
+                <div id="view-loader">正在處理模型資料... 0%</div>
+                
+                <div id="canvas-controls">
+                    <button id="canvas-play-btn" disabled>▶ 播放</button>
+                    <input type="range" id="canvas-slider" min="0" max="100" value="0" step="0.1" disabled>
+                    <span id="canvas-time-display">00:00 / 00:00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card full-row">
+            <h2 style="display: flex; justify-content: space-between; align-items: center; margin: 0 0 10px 0;">
+                <span>📋 即時操作日誌確認</span>
+                <button id="clear-log" style="background:none; border:none; color:#6c7086; cursor:pointer; font-size:0.8rem;">[清除日誌]</button>
+            </h2>
+            <div id="log-container" class="log-panel"></div>
+        </div>
+    </div>
+
+    <script>
+        const logContainer = document.getElementById('log-container');
+        const audioUpload = document.getElementById('audio-upload');
+        const modelUpload = document.getElementById('model-upload');
+        const recordBtn = document.getElementById('record-btn');
+        const denoiseToggle = document.getElementById('denoise-toggle');
+        const denoiseStrength = document.getElementById('denoise-strength');
+        const denoiseStrengthVal = document.getElementById('denoise-strength-val');
+        const analysisModeSelect = document.getElementById('analysis-mode');
+        const blinkToggle = document.getElementById('blink-toggle');
+        const exportVmdBtn = document.getElementById('export-vmd-btn');
+        const exportMp4Btn = document.getElementById('export-mp4-btn');
+        const audioPlayer = document.getElementById('audio-player');
+        const viewLoader = document.getElementById('view-loader');
+        const canvasContainer = document.getElementById('canvas-container');
+        
+        const canvasPlayBtn = document.getElementById('canvas-play-btn');
+        const canvasSlider = document.getElementById('canvas-slider');
+        const canvasTimeDisplay = document.getElementById('canvas-time-display');
+
+        // 唇部縮放滑桿與數值顯示元素
+        const lipWidthInput = document.getElementById('lip-width');
+        const lipHeightInput = document.getElementById('lip-height');
+        const lipTeethInput = document.getElementById('lip-teeth');
+        const lipWidthVal = document.getElementById('lip-width-val');
+        const lipHeightVal = document.getElementById('lip-height-val');
+        const lipTeethVal = document.getElementById('lip-teeth-val');
+
+        // 新增的 DOM 元素與全域變數
+        const downloadRecordBtn = document.getElementById('download-record-btn');
+        let lastRecordedBlob = null;
+
+        // 優化降噪所需之來源資料暫存快取
+        let originalRecordedBlob = null;
+        let originalUploadedBlob = null;
+        let isRecordingSource = false;
+
+        let scene, camera, renderer, currentMesh = null;
+        let fileUrls = {}; 
+        let audioCtx = null;
+        let mediaRecorder = null, recordedChunks = [], isRecording = false;
+
+        let bakedLipTimeline = []; 
+        let currentAudioRawBuffer = null; 
+        let isScrubbing = false; 
+
+        // 全面擴充五組標準日文口型匹配
+        let morphIndices = { 
+            a: -1, i: -1, u: -1, e: -1, o: -1,
+            teethDown: -1, teethUp: -1, teethBase: -1, jawMorph: -1,
+            blink: -1 
+        };
+        // 保存模型中實際匹配到的真正 Morph 名稱字串
+        let actualMorphNames = {
+            a: '', i: '', u: '', e: '', o: '',
+            teethDown: '', teethUp: '', teethBase: '', jawMorph: '',
+            blink: ''
+        };
+        let jawBone = null; 
+        let lastBlinkTime = Date.now();
+        let nextBlinkInterval = 3000;
+
+        // 搖桿連續按壓狀態變數
+        let joyInterval = null;
+        const cameraMoveSpeed = 0.04;
+        const cameraRotateSpeed = 0.025; // 鏡頭 Orbit 旋轉速度係數
+
+        // 自研 Shift_JIS 位元組靜態動態複合解析集（解決無內建編碼器與非標準命名輸出亂碼限制）
+        function getShiftJISBytes(str) {
+            const result = [];
+            const knownMap = {
+                'あ': [0x82, 0xA0], 'い': [0x82, 0xA2], 'う': [0x82, 0xA4], 'え': [0x82, 0xA6], 'お': [0x82, 0xA8],
+                'まばたき': [0x82, 0xDC, 0x82, 0xCE, 0x82, 0xBD, 0x82, 0xAB],
+                '歯下げ': [0x8E, 0x95, 0x8A, 0x47, 0x82, 0xB9],
+                '下歯下げ': [0x82, 0xAA, 0x8E, 0x95, 0x8A, 0x47, 0x82, 0xB9],
+                '上歯下げ': [0x8F, 0xE0, 0x8E, 0x95, 0x8A, 0x47, 0x82, 0xB9],
+                '歯下げる': [0x8E, 0x95, 0x8A, 0x47, 0x82, 0xCC, 0x82, 0xE2],
+                '歯': [0x8E, 0x95],
+                '歯細分': [0x8E, 0x95, 0x8D, 0xD3, 0x95, 0xAC],
+                '顎': [0x8A, 0x7A],
+                'あご': [0x82, 0xA0, 0x82, 0xB5],
+                '顎下げ': [0x8A, 0x7A, 0x8A, 0x47, 0x82, 0xB9],
+                '下顎': [0x82, 0xAA, 0x8A, 0x7A],
+                '下あご': [0x82, 0xAA, 0x82, 0xA0, 0x82, 0xB5],
+                '目_まばたき': [0x95, 0x1C, 0x5F, 0x82, 0xDC, 0x82, 0xCE, 0x82, 0xBD, 0x82, 0xAB],
+                '口_あ': [0x83, 0x6E, 0x5F, 0x82, 0xA0],
+                '口_い': [0x83, 0x6E, 0x5F, 0x82, 0xA2],
+                '口_う': [0x83, 0x6E, 0x5F, 0x82, 0xA4],
+                '口_え': [0x83, 0x6E, 0x5F, 0x82, 0xA6],
+                '口_お': [0x83, 0x6E, 0x5F, 0x82, 0xA8]
+            };
+            if (knownMap[str]) return knownMap[str];
+            for (let i = 0; i < str.length; i++) {
+                const char = str[i];
+                if (knownMap[char]) {
+                    result.push(...knownMap[char]);
+                } else {
+                    const code = char.charCodeAt(0);
+                    if (code < 128) result.push(code);
+                    else result.push(0x3F); // 無法識別時使用 '?' 補位避免長度偏移
+                }
+            }
+            return result;
+        }
+
+        function addLog(text, type = 'info') {
+            const now = new Date();
+            const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+            const item = document.createElement('div');
+            item.className = 'log-item';
+            item.innerHTML = `<span class="log-time">[${timeStr}]</span><span class="log-${type}">${text}</span>`;
+            logContainer.appendChild(item);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function init3D() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x11111b); 
+
+            camera = new THREE.PerspectiveCamera(45, canvasContainer.clientWidth / canvasContainer.clientHeight, 1, 2000);
+            camera.position.set(0, 16.3, 7.0); 
+            camera.lookAt(new THREE.Vector3(0, 16.2, 0));
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.55);
+            dirLight.position.set(5, 20, 10);
+            scene.add(dirLight);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); // 啟用 preserveDrawingBuffer 以支援 Canvas 錄製
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+            canvasContainer.appendChild(renderer.domElement);
+
+            addLog('標準 3D 渲染視窗已啟動。', 'success');
+
+            // 滑桿即時數據變更顯示
+            lipWidthInput.addEventListener('input', () => { lipWidthVal.textContent = parseFloat(lipWidthInput.value).toFixed(1); });
+            lipHeightInput.addEventListener('input', () => { lipHeightVal.textContent = parseFloat(lipHeightInput.value).toFixed(1); });
+            lipTeethInput.addEventListener('input', () => { lipTeethVal.textContent = parseFloat(lipTeethInput.value).toFixed(1); });
+
+            // 註冊搖桿操控滑鼠與觸控事件
+            setupJoystick();
+
+            // 綁定重置鏡頭事件
+            document.getElementById('joy-reset').addEventListener('click', () => {
+                if (!camera) return;
+                camera.position.set(0, 16.3, 7.0);
+                camera.lookAt(new THREE.Vector3(0, 16.2, 0));
+                addLog('視角控制完成重置，已還原至預設鏡頭位置。', 'success');
+            });
+
+            function animate() {
+                requestAnimationFrame(animate);
+                runAbsoluteLipSync();
+                runBlinkSystem();
+
+                if (currentMesh && audioPlayer.paused) {
+                    currentMesh.rotation.y = Math.sin(Date.now() * 0.0004) * 0.06;
+                } else if (currentMesh) {
+                    currentMesh.rotation.y = 0;
+                }
+                
+                updatePlaybackTimer();
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+
+        // 搖桿連續按壓計算驅動
+        function setupJoystick() {
+            function startCamMove(dir) {
+                if(joyInterval) clearInterval(joyInterval);
+                joyInterval = setInterval(() => {
+                    if(!camera) return;
+                    if(dir === 'up') camera.position.y += cameraMoveSpeed;
+                    if(dir === 'down') camera.position.y -= cameraMoveSpeed;
+                    
+                    // 左右改為繞中心點 (0, camera.position.y, 0) 做圓周 Orbit 旋轉
+                    if(dir === 'left' || dir === 'right') {
+                        const targetY = 16.2; // 鏡頭目標高度基底
+                        const center = new THREE.Vector3(0, camera.position.y, 0);
+                        const radius = Math.sqrt(camera.position.x * camera.position.x + camera.position.z * camera.position.z);
+                        let angle = Math.atan2(camera.position.z, camera.position.x);
+                        
+                        if(dir === 'left') angle += cameraRotateSpeed;
+                        if(dir === 'right') angle -= cameraRotateSpeed;
+                        
+                        camera.position.x = Math.cos(angle) * radius;
+                        camera.position.z = Math.sin(angle) * radius;
+                        camera.lookAt(new THREE.Vector3(0, targetY, 0));
+                    }
+                }, 16);
+            }
+
+            function stopCamMove() {
+                if(joyInterval) {
+                    clearInterval(joyInterval);
+                    joyInterval = null;
+                }
+            }
+
+            ['up', 'down', 'left', 'right'].forEach(dir => {
+                const btn = document.getElementById(`joy-${dir}`);
+                btn.addEventListener('mousedown', () => startCamMove(dir));
+                btn.addEventListener('touchstart', (e) => { e.preventDefault(); startCamMove(dir); });
+            });
+
+            window.addEventListener('mouseup', stopCamMove);
+            window.addEventListener('touchend', stopCamMove);
+            canvasContainer.addEventListener('mouseleave', stopCamMove);
+        }
+
+        window.addEventListener('resize', () => {
+            if (!renderer) return;
+            camera.aspect = canvasContainer.clientWidth / canvasContainer.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+        });
+
+        // 核心演算法：改為純預讀烘焙結果與實時面板係數映射（徹底擺脫螢幕更新率影響）
+        function runAbsoluteLipSync() {
+            if (!currentMesh || bakedLipTimeline.length === 0) return;
+
+            const currentTime = audioPlayer.currentTime;
+            const fps = 60;
+            const frameIndex = Math.floor(currentTime * fps);
+
+            // 抓取縮放控制數值
+            const wMult = parseFloat(lipWidthInput.value);
+            const hMult = parseFloat(lipHeightInput.value);
+            const tMult = parseFloat(lipTeethInput.value);
+
+            if (frameIndex >= 0 && frameIndex < bakedLipTimeline.length) {
+                const frame = bakedLipTimeline[frameIndex];
+
+                // 讀取已經在 60FPS 下平滑化烘焙完畢的基底數值，並附加倍率映射
+                const finalA = Math.min(frame.a * hMult, 1.0);
+                const finalI = Math.min(frame.i * wMult, 1.0);
+                const finalU = Math.min(frame.u * wMult, 1.0);
+                const finalE = Math.min(frame.e * hMult, 1.0);
+                const finalO = Math.min(frame.o * hMult, 1.0);
+
+                const finalTeethDown = Math.min(frame.totalOpen * tMult, 1.0);
+                const finalTeethUp = Math.min(frame.totalOpen * 0.3 * tMult, 1.0);
+                const finalTeethBase = Math.min(frame.totalOpen * tMult, 1.0);
+                const finalJawMorph = Math.min(frame.totalOpen * 0.9 * tMult, 1.0);
+
+                const setMorph = (idx, val) => {
+                    if (idx !== -1) currentMesh.morphTargetInfluences[idx] = val;
+                };
+
+                // 1. 嘴唇表情變形
+                setMorph(morphIndices.a, finalA);
+                setMorph(morphIndices.i, finalI);
+                setMorph(morphIndices.u, finalU);
+                setMorph(morphIndices.e, finalE);
+                setMorph(morphIndices.o, finalO);
+
+                // 2. 齒顎變形
+                setMorph(morphIndices.teethDown, finalTeethDown);
+                setMorph(morphIndices.teethUp, finalTeethUp);
+                setMorph(morphIndices.teethBase, finalTeethBase);
+                setMorph(morphIndices.jawMorph, finalJawMorph);
+
+                // 3. 補償性骨骼下顎旋轉
+                if (jawBone) {
+                    jawBone.rotation.x = frame.totalOpen * 0.16 * tMult;
+                }
+            } else {
+                resetMouth();
+            }
+        }
+
+        function resetMouth() {
+            if(!currentMesh) return;
+            ['a', 'i', 'u', 'e', 'o', 'teethDown', 'teethUp', 'teethBase', 'jawMorph'].forEach(key => {
+                if(morphIndices[key] !== -1) {
+                    // 重置時給予固定平滑，避免生硬閉嘴
+                    currentMesh.morphTargetInfluences[morphIndices[key]] += (0 - currentMesh.morphTargetInfluences[morphIndices[key]]) * 0.35;
+                }
+            });
+            if(jawBone) jawBone.rotation.x += (0 - jawBone.rotation.x) * 0.35;
+        }
+
+        function runBlinkSystem() {
+            if (!blinkToggle.checked || !currentMesh || morphIndices.blink === -1) return;
+            let now = Date.now();
+            let elapsed = now - lastBlinkTime;
+            if (elapsed > nextBlinkInterval) {
+                let blinkProgress = (elapsed - nextBlinkInterval) / 160; 
+                if (blinkProgress <= 1.0) {
+                    currentMesh.morphTargetInfluences[morphIndices.blink] = Math.sin(blinkProgress * Math.PI);
+                } else {
+                    currentMesh.morphTargetInfluences[morphIndices.blink] = 0;
+                    lastBlinkTime = now;
+                    nextBlinkInterval = 2000 + Math.random() * 4000;
+                }
+            }
+        }
+
+        // 模糊名稱匹配集（相容 NicoNico/Booth/BowlRoll 及 VRChat 各平台複合式命名法）
+        function findBestMorphMatch(dict, potentialNames) {
+            const dictKeys = Object.keys(dict);
+            for (let name of potentialNames) {
+                if (dict[name] !== undefined) return name;
+            }
+            for (let name of potentialNames) {
+                const foundKey = dictKeys.find(k => k.toLowerCase() === name.toLowerCase() || k.toLowerCase().includes(name.toLowerCase()));
+                if (foundKey) return foundKey;
+            }
+            return null;
+        }
+
+        // 深度相容主流 MMD 表情名稱（擴展支援 あ、い、う、え、お）
+        function findMorphAndBones(mesh) {
+            if (!mesh.morphTargetDictionary) return;
+            const dict = mesh.morphTargetDictionary;
+
+            // 擴展標準口型多路相容集並保存原始字串路徑
+            const nameA = findBestMorphMatch(dict, ['あ', 'A', 'a', 'Mouth_A', 'Mouth_a', 'viseme_aa', 'v_aa', '口_あ']);
+            morphIndices.a = nameA ? dict[nameA] : -1; actualMorphNames.a = nameA || '';
+
+            const nameI = findBestMorphMatch(dict, ['い', 'I', 'i', 'Mouth_I', 'Mouth_i', 'viseme_ih', 'v_ih', '口_い']);
+            morphIndices.i = nameI ? dict[nameI] : -1; actualMorphNames.i = nameI || '';
+
+            const nameU = findBestMorphMatch(dict, ['う', 'U', 'u', 'Mouth_U', 'Mouth_u', 'viseme_ou', 'v_ou', '口_う']);
+            morphIndices.u = nameU ? dict[nameU] : -1; actualMorphNames.u = nameU || '';
+
+            const nameE = findBestMorphMatch(dict, ['え', 'E', 'e', 'Mouth_E', 'Mouth_e', 'viseme_eh', 'v_eh', '口_え']);
+            morphIndices.e = nameE ? dict[nameE] : -1; actualMorphNames.e = nameE || '';
+
+            const nameO = findBestMorphMatch(dict, ['お', 'O', 'o', 'Mouth_O', 'Mouth_o', 'viseme_oh', 'v_oh', '口_お']);
+            morphIndices.o = nameO ? dict[nameO] : -1; actualMorphNames.o = nameO || '';
+            
+            const nameBlink = findBestMorphMatch(dict, ['まばたき', 'Blink', 'blink', '目_まばたき', 'vrc.blink']);
+            morphIndices.blink = nameBlink ? dict[nameBlink] : -1; actualMorphNames.blink = nameBlink || '';
+            
+            // 針對標準與魔改 MMD 精準捕獲四大牙齒下沉表情
+            const nameTeethDown = findBestMorphMatch(dict, ['歯下げ', '下歯下げ', '歯下げる', 'teeth_down', 'TeethDown']);
+            morphIndices.teethDown = nameTeethDown ? dict[nameTeethDown] : -1; actualMorphNames.teethDown = nameTeethDown || '';
+
+            const nameTeethUp = findBestMorphMatch(dict, ['上歯下げ', '歯上げ', 'teeth_up']);
+            morphIndices.teethUp = nameTeethUp ? dict[nameTeethUp] : -1; actualMorphNames.teethUp = nameTeethUp || '';
+
+            const nameTeethBase = findBestMorphMatch(dict, ['歯', '歯細分', 'teeth', 'Tooth']);
+            morphIndices.teethBase = nameTeethBase ? dict[nameTeethBase] : -1; actualMorphNames.teethBase = nameTeethBase || '';
+
+            const nameJawMorph = findBestMorphMatch(dict, ['顎', 'あご', '顎下げ', 'jaw_down', 'Jaw']);
+            morphIndices.jawMorph = nameJawMorph ? dict[nameJawMorph] : -1; actualMorphNames.jawMorph = nameJawMorph || '';
+
+            jawBone = null;
+            if (mesh.skeleton && mesh.skeleton.bones) {
+                jawBone = mesh.skeleton.bones.find(b => b.name === '下顎' || b.name.toLowerCase() === 'jaw' || b.name.includes('下あご'));
+            }
+
+            if (morphIndices.teethDown !== -1 || morphIndices.jawMorph !== -1) {
+                addLog(`[相容匹配成功] 尋獲專屬『齒顎下移』數據鏈，高階牙齒咬合對齊已啟動。`, 'success');
+            } else {
+                addLog(`[相容匹配提示] 此模型無獨立牙齒變形，系統已自動無縫切換為基礎骨骼下顎（Jaw）驅動。`, 'warn');
+            }
+            addLog(`口型綁定檢索完畢: あ:${actualMorphNames.a || '無'}, い:${actualMorphNames.i || '無'}, う:${actualMorphNames.u || '無'}, え:${actualMorphNames.e || '無'}, お:${actualMorphNames.o || '無'}`, 'info');
+        }
+
+        // 高效迭代型快速傅立葉變換(FFT)，防止長音訊呼叫棧溢出
+        function computeFrameFFT(samples) {
+            const N = 512;
+            const re = new Float32Array(N);
+            const im = new Float32Array(N);
+            
+            for (let i = 0; i < N; i++) {
+                if (i < samples.length) {
+                    const windowVal = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (N - 1)));
+                    re[i] = samples[i] * windowVal;
+                }
+            }
+            
+            let j = 0;
+            for (let i = 0; i < N - 1; i++) {
+                if (i < j) {
+                    let temp = re[i]; re[i] = re[j]; re[j] = temp;
+                }
+                let m = N >> 1;
+                while (m >= 1 && j >= m) {
+                    j -= m;
+                    m >>= 1;
+                }
+                j += m;
+            }
+            
+            for (let len = 2; len <= N; len <<= 1) {
+                let angle = -2 * Math.PI / len;
+                let wlen_re = Math.cos(angle);
+                let wlen_im = Math.sin(angle);
+                for (let i = 0; i < N; i += len) {
+                    let w_re = 1;
+                    let w_im = 0;
+                    for (let k = 0; k < len / 2; k++) {
+                        let u_re = re[i + k];
+                        let u_im = im[i + k];
+                        let idx = i + k + len / 2;
+                        let t_re = re[idx] * w_re - im[idx] * w_im;
+                        let t_im = re[idx] * w_im + im[idx] * w_re;
+                        re[i + k] = u_re + t_re;
+                        im[i + k] = u_im + t_im;
+                        re[idx] = u_re - t_re;
+                        im[idx] = u_im + t_im;
+                        let next_w_re = w_re * wlen_re - w_im * wlen_im;
+                        w_im = w_re * wlen_im + w_im * wlen_re;
+                        w_re = next_w_re;
+                    }
+                }
+            }
+            
+            const magnitudes = new Float32Array(N / 2);
+            for (let i = 0; i < N / 2; i++) {
+                magnitudes[i] = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
+            }
+            return magnitudes;
+        }
+
+        // 核心運作烘焙引擎 (改進版：直接在 60FPS 軸上完成所有音素平滑烘焙)
+        function processBakeEngine(audioBuffer) {
+            const channelData = audioBuffer.getChannelData(0); 
+            const sampleRate = audioBuffer.sampleRate;
+            const duration = audioBuffer.duration;
+
+            const fps = 60;
+            const frameDuration = 1 / fps;
+            const totalFrames = Math.floor(duration * fps);
+            const samplesPerFrame = Math.floor(sampleRate / fps);
+
+            bakedLipTimeline = []; 
+            const currentMode = analysisModeSelect.value;
+            const gateThreshold = denoiseToggle.checked ? parseFloat(denoiseStrength.value) : 0.006;
+
+            addLog(`開始口型數據烘焙運算，模式: [${currentMode === 'ai_phoneme' ? 'AI音素辨識' : '基礎強度'}]，設定降噪門檻: ${gateThreshold}`, 'warn');
+
+            // 宣告固定 60FPS 狀態下的平滑狀態機變數
+            let simA = 0, simI = 0, simU = 0, simE = 0, simO = 0;
+            let simTotalOpen = 0;
+
+            for (let f = 0; f < totalFrames; f++) {
+                const startSample = f * samplesPerFrame;
+                const endSample = Math.min(startSample + samplesPerFrame, channelData.length);
+                const frameLength = endSample - startSample;
+
+                let fA = 0, fI = 0, fU = 0, fE = 0, fO = 0;
+
+                if (frameLength > 0) {
+                    // 1. 計算本幀的基礎音量強度 (RMS)
+                    let sumRMS = 0;
+                    for (let i = startSample; i < endSample; i++) {
+                        sumRMS += channelData[i] * channelData[i];
+                    }
+                    let rms = Math.sqrt(sumRMS / frameLength);
+                    let intensity = Math.min(rms * 6.5, 1.0); 
+                    
+                    // 門檻防噪過濾
+                    if (intensity < gateThreshold) intensity = 0; 
+
+                    if (intensity > 0) {
+                        if (currentMode === 'ai_phoneme') {
+                            // 2. AI 音素辨識模式：提取特定訊號區間進行共振峰頻段特徵估算
+                            const sampleSlice = new Float32Array(512);
+                            for(let i=0; i<512; i++) {
+                                const idx = startSample + i;
+                                sampleSlice[i] = idx < channelData.length ? channelData[idx] : 0;
+                            }
+                            
+                            const spectrum = computeFrameFFT(sampleSlice);
+                            
+                            // 定義各母音特徵的核心共振頻域帶 (Hz)
+                            let b_low = 0, b_mid = 0, b_mid_high = 0, b_high = 0;
+                            let total_voice_band = 0;
+
+                            for (let b = 2; b < spectrum.length; b++) {
+                                const freq = b * sampleRate / 512;
+                                const mag = spectrum[b];
+                                if (freq >= 180 && freq < 3400) total_voice_band += mag;
+
+                                if (freq >= 200 && freq < 550) b_low += mag;
+                                else if (freq >= 550 && freq < 1050) b_mid += mag;
+                                else if (freq >= 1050 && freq < 1650) b_mid_high += mag;
+                                else if (freq >= 1650 && freq < 3200) b_high += mag;
+                            }
+
+                            // 標準化能量比例
+                            const r_low = b_low / (total_voice_band || 1);
+                            const r_mid = b_mid / (total_voice_band || 1);
+                            const r_mid_high = b_mid_high / (total_voice_band || 1);
+                            const r_high = b_high / (total_voice_band || 1);
+
+                            // 計算特徵分布權重分值
+                            let scoreA = r_mid * 1.5 + r_mid_high * 1.1 - r_high * 0.6;
+                            let scoreI = r_high * 2.0 + r_low * 0.5 - r_mid * 0.8;
+                            let scoreU = r_low * 2.0 - r_mid_high * 1.1 - r_high * 1.1;
+                            let scoreE = r_high * 1.2 + r_mid * 0.9 + r_low * 0.4 - r_mid_high * 0.6;
+                            let scoreO = r_mid * 1.6 + r_low * 0.9 - r_mid_high * 1.3 - r_high * 1.3;
+
+                            scoreA = Math.max(0.01, scoreA);
+                            scoreI = Math.max(0.01, scoreI);
+                            scoreU = Math.max(0.01, scoreU);
+                            scoreE = Math.max(0.01, scoreE);
+                            scoreO = Math.max(0.01, scoreO);
+
+                            // ⭐ 混合權重核心改動：按比例計算分配
+                            const scoreSum = scoreA + scoreI + scoreU + scoreE + scoreO;
+                            if (scoreSum > 0) {
+                                fA = intensity * (scoreA / scoreSum);
+                                fI = intensity * (scoreI / scoreSum);
+                                fU = intensity * (scoreU / scoreSum);
+                                fE = intensity * (scoreE / scoreSum);
+                                fO = intensity * (scoreO / scoreSum);
+                            }
+                        } else {
+                            // 基礎音量強度映射模式 (維持原版邏輯映射 A, I, U)
+                            fA = intensity * 0.95;
+                            fI = intensity > 0.45 ? (intensity - 0.45) * 0.6 : 0;
+                            fU = intensity > 0.15 && intensity <= 0.55 ? 0.4 : 0;
+                        }
+                    }
+                }
+
+                // 注入原本在動畫迴圈中的 0.35 權重進行固定 60FPS 平滑累積
+                simA += (fA - simA) * 0.35;
+                simI += (fI - simI) * 0.35;
+                simU += (fU - simU) * 0.35;
+                simE += (fE - simE) * 0.35;
+                simO += (fO - simO) * 0.35;
+
+                // 預解算總張口度並平滑化，以完美同步齒顎與下顎運動
+                const totalOpenAmt = fA + fE * 0.6 + fO * 0.8;
+                simTotalOpen += (totalOpenAmt - simTotalOpen) * 0.35;
+
+                bakedLipTimeline.push({
+                    time: f * frameDuration,
+                    a: simA, i: simI, u: simU, e: simE, o: simO,
+                    totalOpen: simTotalOpen
+                });
+            }
+
+            addLog(`【運算更新】成功完成 ${totalFrames} 幀之多母音口型與高階咬合數據烘焙！`, 'success');
+            
+            canvasPlayBtn.disabled = false;
+            canvasSlider.disabled = false;
+            exportVmdBtn.disabled = false; 
+            exportMp4Btn.disabled = false; // 啟用 MP4 導出按鈕
+        }
+
+        // 新增功能：Web Audio API 專業核心高階降噪濾波處理鏈
+        async function applyAudioDenoise(audioBuffer, strength) {
+            const sampleRate = audioBuffer.sampleRate;
+            const numChannels = audioBuffer.numberOfChannels;
+            const offlineCtx = new OfflineAudioContext(numChannels, audioBuffer.length, sampleRate);
+
+            const source = offlineCtx.createBufferSource();
+            source.buffer = audioBuffer;
+
+            // 1. 高通濾波器：切除 100Hz 以下的人聲低頻環境紅噪聲、微動雜訊、低頻電流聲
+            const hpFilter = offlineCtx.createBiquadFilter();
+            hpFilter.type = 'highpass';
+            hpFilter.frequency.value = 100;
+
+            // 2. 低通濾波器：切除 8000Hz 以上的高頻電子白噪聲與電流毛刺
+            const lpFilter = offlineCtx.createBiquadFilter();
+            lpFilter.type = 'lowpass';
+            lpFilter.frequency.value = 8000;
+
+            // 3. 動態壓限器：平滑化突發尖銳爆音，並溫和放大微弱語音信號結構
+            const compressor = offlineCtx.createDynamicsCompressor();
+            compressor.threshold.value = -20;
+            compressor.knee.value = 25;
+            compressor.ratio.value = 3;
+            compressor.attack.value = 0.005;
+            compressor.release.value = 0.05;
+
+            // 連結 Web Audio 組件節點
+            source.connect(hpFilter);
+            hpFilter.connect(lpFilter);
+            lpFilter.connect(compressor);
+            compressor.connect(offlineCtx.destination);
+
+            source.start(0);
+            const renderedBuffer = await offlineCtx.startRendering();
+
+            // 4. 時域智慧平滑包絡軟化噪音門 (Downward Expander)
+            // 將滑桿強度作為門檻，以動態漸變增益消除無聲段落空白噪音，避免機械性卡頓硬切碎音
+            const attackTime = 0.01; 
+            const releaseTime = 0.04; 
+            const gAttack = Math.exp(-1 / (sampleRate * attackTime));
+            const gRelease = Math.exp(-1 / (sampleRate * releaseTime));
+
+            for (let c = 0; c < numChannels; c++) {
+                const data = renderedBuffer.getChannelData(c);
+                let env = 0;
+                for (let i = 0; i < data.length; i++) {
+                    const absVal = Math.abs(data[i]);
+                    if (absVal > env) {
+                        env = gAttack * env + (1 - gAttack) * absVal;
+                    } else {
+                        env = gRelease * env + (1 - gRelease) * absVal;
+                    }
+
+                    if (env < strength) {
+                        const factor = env / (strength || 0.001);
+                        const gain = Math.min(1.0, Math.pow(factor, 1.5)); 
+                        data[i] *= gain;
+                    }
+                }
+            }
+
+            return renderedBuffer;
+        }
+
+        // 新增功能：將高階降噪處理後的處理結果 AudioBuffer 快速打包編譯成標準可播放之二進位原生 WAV Blob 封裝
+        function bufferToWav(buffer) {
+            let numOfChan = buffer.numberOfChannels,
+                sampleRate = buffer.sampleRate,
+                format = 1, // 1 = Uncompressed PCM
+                bitDepth = 16,
+                resultBuffer;
+            
+            if (numOfChan === 2) {
+                resultBuffer = interleave(buffer.getChannelData(0), buffer.getChannelData(1));
+            } else {
+                resultBuffer = buffer.getChannelData(0);
+            }
+            
+            let bufferArr = new ArrayBuffer(44 + resultBuffer.length * 2);
+            let view = new DataView(bufferArr);
+            
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + resultBuffer.length * 2, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, format, true);
+            view.setUint16(22, numOfChan, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * numOfChan * 2, true);
+            view.setUint16(32, numOfChan * 2, true);
+            view.setUint16(34, bitDepth, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, resultBuffer.length * 2, true);
+            
+            let offset = 44;
+            for (let i = 0; i < resultBuffer.length; i++, offset += 2) {
+                let s = Math.max(-1, Math.min(1, resultBuffer[i]));
+                view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+            
+            return new Blob([view], { type: 'audio/wav' });
+            
+            function interleave(inputL, inputR) {
+                let length = inputL.length + inputR.length;
+                let result = new Float32Array(length);
+                let index = 0, inputIndex = 0;
+                while (index < length) {
+                    result[index++] = inputL[inputIndex];
+                    result[index++] = inputR[inputIndex];
+                    inputIndex++;
+                }
+                return result;
+            }
+            
+            function writeString(view, offset, string) {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            }
+        }
+
+        // 新增功能：集中控制音訊核心處理管線，保證預覽、播放與下載與 UI 保持絕對 1:1 強制同步
+        async function refreshAudioPipeline(isInitialLoad = false) {
+            if (!currentAudioRawBuffer) return;
+
+            viewLoader.style.display = 'block';
+            viewLoader.textContent = '⚡ 正在處理高級音訊降噪與口型烘焙...';
+
+            try {
+                const strength = parseFloat(denoiseStrength.value);
+                let processedBuffer = currentAudioRawBuffer;
+
+                if (denoiseToggle.checked) {
+                    processedBuffer = await applyAudioDenoise(currentAudioRawBuffer, strength);
+                }
+
+                // 執行口型同步烘焙運算
+                processBakeEngine(processedBuffer);
+
+                // 產生供網頁播放與匯出的對應 Blob
+                let activeBlob = null;
+                if (denoiseToggle.checked) {
+                    activeBlob = bufferToWav(processedBuffer);
+                } else {
+                    activeBlob = isRecordingSource ? originalRecordedBlob : originalUploadedBlob;
+                }
+
+                // 若目前來源是錄音，同步更新下載按鈕之指定綁定對象
+                if (isRecordingSource) {
+                    lastRecordedBlob = activeBlob;
+                }
+
+                // 更新實時播放器音訊，並平滑恢復當前進度與播放狀態（解決滑桿/切換重設開頭缺陷）
+                const currentTime = audioPlayer.currentTime;
+                const isPaused = audioPlayer.paused;
+
+                if (audioPlayer.src) {
+                    URL.revokeObjectURL(audioPlayer.src);
+                }
+                audioPlayer.src = URL.createObjectURL(activeBlob);
+
+                if (!isInitialLoad) {
+                    const onMetadata = () => {
+                        audioPlayer.currentTime = Math.min(currentTime, audioPlayer.duration || 0);
+                        if (!isPaused) audioPlayer.play().catch(()=>{});
+                        audioPlayer.removeEventListener('loadedmetadata', onMetadata);
+                    };
+                    audioPlayer.addEventListener('loadedmetadata', onMetadata);
+                }
+
+                viewLoader.style.display = 'none';
+            } catch (err) {
+                viewLoader.style.display = 'none';
+                addLog(`音訊降噪管線處理失敗: ${err.message}`, 'err');
+            }
+        }
+
+        async function loadAndBakeAudio(audioBlobOrFile) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+            viewLoader.style.display = 'block';
+            viewLoader.textContent = '⚡ 正在預運算音訊咬合時間軸...';
+
+            try {
+                const arrayBuffer = await audioBlobOrFile.arrayBuffer();
+                currentAudioRawBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                
+                await refreshAudioPipeline(true);
+                viewLoader.style.display = 'none';
+            } catch (err) {
+                viewLoader.style.display = 'none';
+                addLog(`音訊解析烘焙失敗: ${err.message}`, 'err');
+            }
+        }
+
+        // 監聽降噪開關、強度與分析模式的變更，並自動即時重算
+        denoiseToggle.addEventListener('change', () => {
+            addLog(`智慧降噪開關狀態切換: ${denoiseToggle.checked ? '[開啟]' : '[關閉]'}`, 'info');
+            if (currentAudioRawBuffer) refreshAudioPipeline(false);
+        });
+
+        denoiseStrength.addEventListener('input', () => {
+            denoiseStrengthVal.textContent = parseFloat(denoiseStrength.value).toFixed(3);
+        });
+
+        denoiseStrength.addEventListener('change', () => {
+            addLog(`降噪強度變更為: ${parseFloat(denoiseStrength.value).toFixed(3)}`, 'info');
+            if (currentAudioRawBuffer) refreshAudioPipeline(false);
+        });
+
+        analysisModeSelect.addEventListener('change', () => {
+            addLog(`語音分析模式切換為: [${analysisModeSelect.value === 'ai_phoneme' ? 'AI 音素辨識模式' : '基礎音量強度模式'}]`, 'info');
+            if (currentAudioRawBuffer) refreshAudioPipeline(false);
+        });
+
+        canvasSlider.addEventListener('input', () => {
+            if (!audioPlayer.duration) return;
+            isScrubbing = true;
+            const targetTime = (canvasSlider.value / 100) * audioPlayer.duration;
+            audioPlayer.currentTime = targetTime;
+            runAbsoluteLipSync();
+        });
+
+        canvasSlider.addEventListener('change', () => { isScrubbing = false; });
+
+        function updatePlaybackTimer() {
+            if (!audioPlayer.duration) {
+                canvasTimeDisplay.textContent = "00:00 / 00:00";
+                canvasSlider.value = 0;
+                return;
+            }
+            if (!isScrubbing) {
+                canvasSlider.value = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+            }
+            const formatTime = (secs) => {
+                const m = Math.floor(secs / 60).toString().padStart(2, '0');
+                const s = Math.floor(secs % 60).toString().padStart(2, '0');
+                return `${m}:${s}`;
+            };
+            canvasTimeDisplay.textContent = `${formatTime(audioPlayer.currentTime)} / ${formatTime(audioPlayer.duration)}`;
+        }
+
+        // MMD ZIP 解壓（攔截深層路徑錯誤、不規則檔名與大小寫後綴）
+        modelUpload.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            Object.values(fileUrls).forEach(url => URL.revokeObjectURL(url));
+            fileUrls = {};
+            if(currentMesh) scene.remove(currentMesh);
+            resetMouth();
+
+            addLog(`選取模型: ${file.name}，正在讀取壓縮包結構...`, 'warn');
+            viewLoader.style.display = 'block';
+            viewLoader.textContent = '正在解壓 ZIP 結構...';
+
+            try {
+                const zip = await JSZip.loadAsync(file);
+                const promises = [];
+                zip.forEach((relativePath, zipEntry) => {
+                    if (!zipEntry.dir) {
+                        const promise = zipEntry.async('blob').then((blob) => {
+                            fileUrls[relativePath.replace(/\\/g, '/')] = URL.createObjectURL(blob);
+                        });
+                        promises.push(promise);
+                    }
+                });
+                await Promise.all(promises);
+
+                let pmxPath = Object.keys(fileUrls).find(path => path.toLowerCase().endsWith('.pmx') || path.toLowerCase().endsWith('.pmd'));
+                if (!pmxPath) {
+                    viewLoader.style.display = 'none';
+                    addLog('錯誤：ZIP 壓縮包內找不到有效的 .pmx 或 .pmd 模型主檔案。', 'err');
+                    return;
+                }
+                loadMMDModel(pmxPath);
+            } catch (err) {
+                viewLoader.style.display = 'none';
+                addLog(`解壓載入失敗: ${err.message}`, 'err');
+            }
+        });
+
+        function loadMMDModel(pmxPath) {
+            const loadingManager = new THREE.LoadingManager();
+            loadingManager.addHandler(/\.tga$/i, new THREE.TGALoader(loadingManager));
+            
+            loadingManager.setURLModifier(url => {
+                const decodedUrl = decodeURIComponent(url).replace(/\\/g, '/');
+                for (const path in fileUrls) {
+                    if (decodedUrl.endsWith(path.toLowerCase()) || path.toLowerCase().endsWith(decodedUrl)) {
+                        return fileUrls[path];
+                    }
+                }
+                const urlFileName = decodedUrl.split('/').pop().toLowerCase();
+                for (const path in fileUrls) {
+                    if (path.split('/').pop().toLowerCase() === urlFileName) return fileUrls[path];
+                }
+                return url;
+            });
+
+            const mmdLoader = new THREE.MMDLoader(loadingManager);
+            viewLoader.textContent = '建構 3D 材質與頂點網格...';
+            mmdLoader.load(pmxPath, (mesh) => {
+                currentMesh = mesh;
+                scene.add(currentMesh);
+                findMorphAndBones(currentMesh);
+                viewLoader.style.display = 'none';
+                addLog(`【模型準備完畢】3D 環境網格加載成功。`, 'success');
+            }, (xhr) => {
+                if (xhr.total) {
+                    viewLoader.textContent = `建構網格中... ${Math.round((xhr.loaded / xhr.total) * 100)}%`;
+                }
+            }, err => {
+                viewLoader.style.display = 'none';
+                addLog(`3D 解析錯誤: ${err.message}`, 'err');
+            });
+        }
+
+        audioUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            audioPlayer.pause();
+            canvasPlayBtn.disabled = true;
+            canvasSlider.disabled = true;
+            exportVmdBtn.disabled = true;
+            exportMp4Btn.disabled = true;
+            
+            // 綁定檔案來源並調用處理管線
+            originalUploadedBlob = file;
+            isRecordingSource = false;
+            loadAndBakeAudio(file);
+        });
+
+        recordBtn.addEventListener('click', async () => {
+            if (!isRecording) {
+                recordedChunks = [];
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(recordedChunks, { type: 'audio/mp3' });
+                        
+                        // 綁定錄音來源並調用處理管線
+                        originalRecordedBlob = blob;
+                        isRecordingSource = true;
+                        loadAndBakeAudio(blob);
+                        stream.getTracks().forEach(track => track.stop());
+
+                        // 新增功能：儲存最新錄音並啟用下載錄音按鈕
+                        lastRecordedBlob = blob;
+                        downloadRecordBtn.disabled = false;
+                        addLog('錄音已成功保存，可點擊下載按鈕匯出。', 'success');
+                    };
+                    mediaRecorder.start();
+                    isRecording = true;
+                    recordBtn.textContent = '🛑 停止錄音並啟動運算';
+                    recordBtn.classList.add('recording');
+                    exportVmdBtn.disabled = true;
+                    exportMp4Btn.disabled = true;
+                    downloadRecordBtn.disabled = true; // 新增功能：開始新錄音時先停用下載
+                    addLog('正在錄製人聲，結束後將套用分析與降噪設置進行烘焙...', 'warn');
+                } catch (err) { addLog(`無法啟用錄音: ${err.message}`, 'err'); }
+            } else {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.textContent = '🎙️ 開始錄音模式';
+                recordBtn.classList.remove('recording');
+            }
+        });
+
+        // 核心功能修改：完全免除二次模擬模擬，移除變化門檻過濾以達成與網頁預覽 1:1 絕對對齊
+        exportVmdBtn.addEventListener('click', () => {
+            if (bakedLipTimeline.length === 0) return;
+            addLog("正在編譯與網頁預覽完全同步的 MMD 官方二進位動作軌道...", "warn");
+
+            try {
+                const totalDuration = audioPlayer.duration || 0;
+                const vmdFps = 30; // MMD 內部標準動作計時器 (30幀/秒)
+                const totalVmdFrames = Math.floor(totalDuration * vmdFps);
+                
+                const vmdMorphFrames = [];
+                const vmdBoneFrames = [];
+
+                // 獲取當前網頁滑桿設定，確保輸出與預覽完全同步
+                const wMult = parseFloat(lipWidthInput.value);
+                const hMult = parseFloat(lipHeightInput.value);
+                const tMult = parseFloat(lipTeethInput.value);
+
+                // 隨機眨眼時間軸虛擬模擬暫存
+                let simLastBlinkTime = 0;
+                let simNextBlinkInterval = 3.0;
+
+                // 直接下採樣預烘焙的 60FPS 平滑序列至 30FPS VMD 軌道
+                for (let f = 0; f <= totalVmdFrames; f++) {
+                    const t = f / vmdFps;
+                    const origFrameIndex = Math.floor(t * 60);
+
+                    if (origFrameIndex >= 0 && origFrameIndex < bakedLipTimeline.length) {
+                        const sFrame = bakedLipTimeline[origFrameIndex];
+
+                        // 套用與網頁預覽一模一樣的面板即時縮放權重
+                        const finalA = Math.min(sFrame.a * hMult, 1.0);
+                        const finalI = Math.min(sFrame.i * wMult, 1.0);
+                        const finalU = Math.min(sFrame.u * wMult, 1.0);
+                        const finalE = Math.min(sFrame.e * hMult, 1.0);
+                        const finalO = Math.min(sFrame.o * hMult, 1.0);
+
+                        const finalTeethDown = Math.min(sFrame.totalOpen * tMult, 1.0);
+                        const finalTeethUp = Math.min(sFrame.totalOpen * 0.3 * tMult, 1.0);
+                        const finalTeethBase = Math.min(sFrame.totalOpen * tMult, 1.0);
+                        const finalJawMorph = Math.min(sFrame.totalOpen * 0.9 * tMult, 1.0);
+                        const finalJawRotX = sFrame.totalOpen * 0.16 * tMult;
+
+                        // 寫入模型實際的 Morph 軌道名稱（不設變化閥值過濾，保證極致同步與結尾歸零）
+                        if (morphIndices.a !== -1) vmdMorphFrames.push({ bytes: getShiftJISBytes(actualMorphNames.a), frame: f, weight: finalA });
+                        if (morphIndices.i !== -1) vmdMorphFrames.push({ bytes: getShiftJISBytes(actualMorphNames.i), frame: f, weight: finalI });
+                        if (morphIndices.u !== -1) vmdMorphFrames.push({ bytes: getShiftJISBytes(actualMorphNames.u), frame: f, weight: finalU });
+                        if (morphIndices.e !== -1) vmdMorphFrames.push({ bytes: getShiftJISBytes(actualMorphNames.e), frame: f, weight: finalE });
+                        if (morphIndices.o !== -1) vmdMorphFrames.push({ bytes: getShiftJISBytes(actualMorphNames.o), frame: f, weight: finalO });
+
+                        if (morphIndices.teethDown !== -1) vmdMorphFrames.push({ bytes: getShiftJISBytes(actualMorphNames.teethDown), frame: f, weight: finalTeethDown });
+                        if (morphIndices.teethUp !== -1) vmdMorphFrames.push({ bytes: getShiftJISBytes(actualMorphNames.teethUp), frame: f, weight: finalTeethUp });
+                        if (morphIndices.teethBase !== -1) vmdMorphFrames.push({ bytes: getShiftJISBytes(actualMorphNames.teethBase), frame: f, weight: finalTeethBase });
+                        if (morphIndices.jawMorph !== -1) vmdMorphFrames.push({ bytes: getShiftJISBytes(actualMorphNames.jawMorph), frame: f, weight: finalJawMorph });
+
+                        // 寫入下顎骨骼動畫軌道
+                        if (jawBone) {
+                            vmdBoneFrames.push({ bytes: getShiftJISBytes(jawBone.name), frame: f, rotX: finalJawRotX });
+                        }
+
+                        // 自然自動眨眼系統（百分之百原樣保留計時與邏輯，不作變更）
+                        if (blinkToggle.checked && morphIndices.blink !== -1) {
+                            let elapsed = t - simLastBlinkTime;
+                            let w = 0;
+                            if (elapsed > simNextBlinkInterval) {
+                                let blinkProgress = (elapsed - simNextBlinkInterval) / 0.160;
+                                if (blinkProgress <= 1.0) {
+                                    w = Math.sin(blinkProgress * Math.PI);
+                                } else {
+                                    w = 0;
+                                    simLastBlinkTime = t;
+                                    simNextBlinkInterval = 2.0 + Math.random() * 4.0;
+                                }
+                            }
+                            vmdMorphFrames.push({ bytes: getShiftJISBytes(actualMorphNames.blink), frame: f, weight: w });
+                        }
+                    }
+                }
+
+                // 計算包含骨骼軌道與表情軌道的完整 VMD 區段二進位大小
+                const totalSize = 30 + 20 + 4 + (vmdBoneFrames.length * 111) + 4 + (vmdMorphFrames.length * 23) + 4 + 4 + 4 + 4;
+                const buffer = new ArrayBuffer(totalSize);
+                const view = new DataView(buffer);
+                let offset = 0;
+
+                // 1. Header 文件標頭 (30 位元組)
+                const headerStr = "Vocaloid Motion Data 0002";
+                for (let i = 0; i < 30; i++) {
+                    view.setUint8(offset + i, i < headerStr.length ? headerStr.charCodeAt(i) : 0);
+                }
+                offset += 30;
+
+                // 2. Model Name 模型名欄位 (20 位元組)
+                const modelStr = "LipSyncGenerated";
+                for (let i = 0; i < 20; i++) {
+                    view.setUint8(offset + i, i < modelStr.length ? modelStr.charCodeAt(i) : 0);
+                }
+                offset += 20;
+
+                // 3. Bone Frame Count 骨骼動畫幀數 (4 位元組)
+                view.setUint32(offset, vmdBoneFrames.length, true);
+                offset += 4;
+
+                // 4. Bone Records 逐幀寫入骨骼結構體 (每幀固定 111 位元組)
+                for (let i = 0; i < vmdBoneFrames.length; i++) {
+                    const b = vmdBoneFrames[i];
+                    for (let j = 0; j < 15; j++) {
+                        view.setUint8(offset + j, j < b.bytes.length ? b.bytes[j] : 0);
+                    }
+                    offset += 15;
+                    view.setUint32(offset, b.frame, true); offset += 4; // 幀號
+                    view.setFloat32(offset, 0, true); offset += 4;      // X Pos
+                    view.setFloat32(offset, 0, true); offset += 4;      // Y Pos
+                    view.setFloat32(offset, 0, true); offset += 4;      // Z Pos
+                    
+                    // 將純歐拉 X 旋轉轉換為標準 MMD 格式四元數數值鏈 (X, Y, Z, W)
+                    const qx = Math.sin(b.rotX / 2);
+                    const qw = Math.cos(b.rotX / 2);
+                    view.setFloat32(offset, qx, true); offset += 4;
+                    view.setFloat32(offset, 0, true); offset += 4;
+                    view.setFloat32(offset, 0, true); offset += 4;
+                    view.setFloat32(offset, qw, true); offset += 4;
+                    
+                    // 填入 64 位元組之 MMD 線性插值預設緩動曲線資料
+                    for (let k = 0; k < 64; k++) {
+                        view.setUint8(offset + k, 0);
+                    }
+                    offset += 64;
+                }
+
+                // 5. Morph Frame Count 表情軌道總幀數 (4 位元組)
+                view.setUint32(offset, vmdMorphFrames.length, true);
+                offset += 4;
+
+                // 6. Morph Records 逐幀寫入表情結構體 (每幀固定 23 位元組)
+                for (let i = 0; i < vmdMorphFrames.length; i++) {
+                    const m = vmdMorphFrames[i];
+                    for (let j = 0; j < 15; j++) {
+                        view.setUint8(offset + j, j < m.bytes.length ? m.bytes[j] : 0);
+                    }
+                    offset += 15;
+                    view.setUint32(offset, m.frame, true); offset += 4;
+                    view.setFloat32(offset, m.weight, true); offset += 4;
+                }
+
+                // 8. 補足其餘計數尾端欄位 (相機、燈光、陰影、IK均填0)
+                view.setUint32(offset, 0, true); offset += 4; 
+                view.setUint32(offset, 0, true); offset += 4; 
+                view.setUint32(offset, 0, true); offset += 4; 
+                view.setUint32(offset, 0, true); offset += 4; 
+
+                // 觸發瀏覽器安全下載流
+                const blob = new Blob([buffer], { type: "application/octet-stream" });
+                const url = URL.createObjectURL(blob);
+                const downloadLink = document.createElement("a");
+                downloadLink.href = url;
+                downloadLink.download = "MMD_LipSync_Output.vmd";
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                URL.revokeObjectURL(url);
+
+                addLog(`🎉 VMD 動態導出完畢！已將預覽 Lerp 完全同步，共計導出 ${vmdMorphFrames.length} 條表情幀與 ${vmdBoneFrames.length} 條下顎骨骼動畫幀。`, "success");
+            } catch (err) {
+                addLog(`VMD 導出失敗: ${err.message}`, "err");
+            }
+        });
+
+        // 新增功能：不破壞原系統之 MP4 錄製引擎
+        exportMp4Btn.addEventListener('click', async () => {
+            if (!renderer || bakedLipTimeline.length === 0) return;
+            
+            addLog("🎥 初始化動畫錄製元件，開始即時錄製預覽視窗...", "warn");
+            exportMp4Btn.disabled = true;
+            
+            try {
+                const streamChunks = [];
+                const canvasElement = renderer.domElement;
+                
+                // 1. 捕捉畫布的視訊流 (30fps)
+                const videoStream = canvasElement.captureStream(30);
+                const combinedStream = new MediaStream();
+                
+                // 引入視訊軌道
+                videoStream.getVideoTracks().forEach(track => combinedStream.addTrack(track));
+                
+                // 2. 安全引入當前播放器內之音訊軌道
+                let audioContextSource = null;
+                const destNode = audioCtx ? audioCtx.createMediaStreamDestination() : null;
+                
+                if (audioPlayer.src && audioCtx) {
+                    // 將播放音訊混入錄製流
+                    audioContextSource = audioCtx.createMediaElementSource(audioPlayer);
+                    audioContextSource.connect(audioCtx.destination);
+                    audioContextSource.connect(destNode);
+                    destNode.stream.getAudioTracks().forEach(track => combinedStream.addTrack(track));
+                }
+                
+                // 3. 設定錄製器
+                const options = { mimeType: 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"' };
+                let rec;
+                try {
+                    rec = new MediaRecorder(combinedStream, options);
+                } catch(e) {
+                    // 若不支援特定 codec 則使用預設
+                    rec = new MediaRecorder(combinedStream, { mimeType: 'video/mp4' });
+                }
+                
+                rec.ondataavailable = (e) => {
+                    if (e.data && e.data.size > 0) streamChunks.push(e.data);
+                };
+                
+                rec.onstop = () => {
+                    // 釋放節點綁定，避免損害播放器功能
+                    if (audioContextSource) {
+                        audioContextSource.disconnect();
+                    }
+                    
+                    const videoBlob = new Blob(streamChunks, { type: 'video/mp4' });
+                    const videoUrl = URL.createObjectURL(videoBlob);
+                    
+                    const downloadLink = document.createElement("a");
+                    downloadLink.href = videoUrl;
+                    downloadLink.download = "MMD_LipSync_Capture.mp4";
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                    URL.revokeObjectURL(videoUrl);
+                    
+                    exportMp4Btn.disabled = false;
+                    addLog("🎉 MP4 視訊動畫錄製並匯出成功！", "success");
+                };
+                
+                // 4. 重置進度至開頭並強制開始同步播放與錄影
+                audioPlayer.currentTime = 0;
+                rec.start();
+                audioPlayer.play();
+                addLog("正在錄影中... 請勿在播放期間手動拖曳進度條或調整視角，直到播放完畢自動輸出。", "info");
+                
+                // 監聽播放結束以完成自動存檔
+                const autoStopRecord = () => {
+                    if (rec && rec.state === "recording") {
+                        rec.stop();
+                    }
+                    audioPlayer.removeEventListener('ended', autoStopRecord);
+                };
+                audioPlayer.addEventListener('ended', autoStopRecord);
+                
+            } catch (err) {
+                exportMp4Btn.disabled = false;
+                addLog(`MP4 錄製失敗: ${err.message}`, "err");
+            }
+        });
+
+        canvasPlayBtn.addEventListener('click', () => {
+            if (audioPlayer.paused) {
+                audioPlayer.play();
+                canvasPlayBtn.textContent = '⏸ 暫停';
+                addLog('音訊軌道開始播放。', 'info');
+            } else {
+                audioPlayer.pause();
+                canvasPlayBtn.textContent = '▶ 播放';
+                resetMouth();
+                addLog('音訊軌道已暫停。', 'info');
+            }
+        });
+
+        audioPlayer.addEventListener('ended', () => {
+            canvasPlayBtn.textContent = '▶ 播放';
+            resetMouth();
+            addLog('音訊播放完畢，口型重置。', 'success');
+        });
+
+        blinkToggle.addEventListener('change', e => addLog(`自動眨眼狀態切換為: ${e.target.checked ? '[開啟]' : '[閉合]'}`, 'info'));
+        document.getElementById('clear-log').addEventListener('click', () => { logContainer.innerHTML = ''; addLog('日誌已清空。', 'info'); });
+
+        // 新增功能：下載錄音按鈕事件監聽器
+        downloadRecordBtn.addEventListener('click', () => {
+            if (!lastRecordedBlob) return;
+            const url = URL.createObjectURL(lastRecordedBlob);
+            const downloadLink = document.createElement("a");
+            downloadLink.href = url;
+            // 根據目前是否啟用降噪決定下載副檔名 (降噪後為高品質 wav)
+            downloadLink.download = denoiseToggle.checked ? "recording_denoised.wav" : "recording.mp3";
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            URL.revokeObjectURL(url);
+            addLog(`🎉 錄音檔下載完畢！(${downloadLink.download})`, 'success');
+        });
+
+        window.onload = () => {
+            addLog('高級多母音自適應音素辨識系統已就緒。', 'success');
+            init3D();
+        };
+    </script>
+</body>
+</html>
